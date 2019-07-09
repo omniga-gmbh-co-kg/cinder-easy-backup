@@ -1,0 +1,4 @@
+shade
+os-client-config
+munch
+paramiko

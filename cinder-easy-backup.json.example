@@ -1,0 +1,52 @@
+{
+  "auth" : {
+    "env_vars": {
+	  "OS_ENDPOINT_TYPE": "internalURL",
+	  "OS_INTERFACE": "internalURL",
+	  "OS_IDENTITY_API_VERSION": "3",
+	  "OS_AUTH_VERSION": "3",
+	  "OS_NO_CACHE": "1",
+	  "OS_REGION_NAME": "RegionOne",
+	  "OS_AUTH_URL": "http://keystone:5000/v3",
+	  "OS_USER_DOMAIN_NAME": "Default",
+	  "OS_USERNAME": "admin",
+	  "OS_PASSWORD": "p@ssword",
+	  "OS_PROJECT_NAME": "admin",
+	  "OS_PROJECT_DOMAIN_NAME": "Default"
+	}
+  },
+  "log": {
+    "file": "/var/log/cinder-easy-backup.log",
+    "level": "INFO"
+  },
+  "backups": {
+    "excludes": {
+      "projects": [
+        "admin",
+        "service",
+        "demo",
+        "cinder"
+      ]
+    },
+    "interval": {
+      "default": 6.95,
+      "project_override" : {
+        "rgb" : 0.95
+      }
+    },
+    "retention": {
+      "default": 4,
+      "project_override": {
+        "office": 3
+      }
+    },
+    "wait_for_completion": {
+      "default": true,
+      "project_override": {
+      }
+    },
+    "post_script": {
+      "office": "/opt/cinder-easy-backup/venv/bin/python /opt/cinder-easy-backup/scripts/sep-manager/sep-manager.py"
+    }
+  }
+}

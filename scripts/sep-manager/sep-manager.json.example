@@ -1,0 +1,20 @@
+{
+  "auth": {
+    "external_file": "/etc/cinder-easy-backup.json",
+    "env_vars" : {
+    }
+  },
+  "sep": {
+    "host": "sesam.host",
+    "task_prefix": "cinder_backup",
+    "timeplan" : "Sat-Full",
+    "client": "backup.host",
+    "base_path": "/mnt/backup/cinder-backup",
+    "sm_cmd" : "/opt/sesam/bin/sesam/sm_cmd",
+    "ssh" : {
+	  "port": 22,
+	  "user": "root",
+	  "password": "p@ssw0rd"
+    }
+  }
+}

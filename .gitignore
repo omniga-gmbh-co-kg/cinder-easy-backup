@@ -1,0 +1,5 @@
+*.log
+openrc
+*.swp
+venv
+

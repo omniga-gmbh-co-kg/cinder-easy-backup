@@ -89,68 +89,70 @@ for p in projects:
       logger.warning('Excluding Instance ' + instances[i]['name'] + ' from Backup (disabled via metadata or no volume attached)')
       instances.pop(i)
 
-  ## build volume dict
+  ## build volume munch
+  all_volumes = munch.Munch()
   for i in instances:
     ## add every volume of an instance
-    volumes = munch.Munch()
     for v in instances[i]['volumes']:
       vol = conn.get_volume_by_id(v['id'])
-      ## unless backup is set to false
+      ## unless backup is set to false or volume has no attachment
       if vol['metadata'].get('backup',True) == 'false':
-        logger.warning('Excluding Volume ' + vol['id'] + 'attached to ' + instances[i]['name'] + ' (disabled via metadata)')
+        logger.warning('Excluding Volume ' + vol['id'] + ' attached to ' + instances[i]['name'] + ' (disabled via metadata)')
+      elif len(vol['attachments']) < 1:
+        logger.warning('Excluding Volume ' + vol['id'] + ' of ' + instances[i]['name'] + ' (not attached)')
       else:
-        volumes[vol['id']] = vol
+        all_volumes[vol['id']] = vol
 
-    ## cycle through volumes and create backups
-    for v in volumes:
+  ## cycle through volumes and create backups
+  for volume_id,volume_data in all_volumes.items():
+    ## look for previous backups of this volume
+    prev_backups = munch.Munch()
+    for b in all_backups:
+      if b['volume_id'] == volume_id:
+        prev_backups[b['id']] = b
 
-      ## look for previous backups of this volume
-      prev_backups = munch.Munch()
-      for b in all_backups:
-        if b['volume_id'] == v:
-          prev_backups[b['id']] = b
+    ## find newest backup and compare timestamps
+    last_backup_time = datetime.datetime(datetime.MINYEAR,1,1)
+    for pb in prev_backups:
+      backup_date = datetime.datetime.strptime(prev_backups[pb]['created_at'], '%Y-%m-%dT%H:%M:%S.%f')
+      if backup_date > last_backup_time:
+        last_backup_time = backup_date
 
-      ## find newest backup and compare timestamps
-      last_backup_time = datetime.datetime(datetime.MINYEAR,1,1)
+    ## make backup
+    now = datetime.datetime.now()
+    last_backup_age_days = round((now-last_backup_time).total_seconds()/60/60/24,2)
+    instance_id = volume_data['attachments'][0]['server_id']
+    if last_backup_age_days >= interval:
+      backup_name = instances[instance_id]['name'] + '_' + volume_id + '_' + now.strftime("%Y-%m-%dT%H-%M-%S")
+      logger.info('Creating Backup ' + backup_name + ' (last backup ' + str(last_backup_age_days) + ' days ago)')
+      try:
+        conn.create_volume_backup(volume_id,name=backup_name,force=True,wait=wait_for_completion)
+        backup_created = True
+      except Exception as e:
+        logger.error('Backup ' + backup_name + ' failed: ' + str(e))
+        backup_created = False
+        continue
+    else:
+      logger.info('Skipping Volume ' + instances[instance_id]['name'] + ':' + volume_id + ' (below interval)')
+      backup_created = False
+
+    ## find oldest backup(s) and delete
+    ## len(prev_backups) is missing newly created backups so we use int(backup_created) to add 1 to it in case a backup was created or 0 if none was created
+    ## this ensures that always 'retention'-number of backups are kept
+    while len(prev_backups) + int(backup_created) > retention:
+      oldest_backup_time = datetime.datetime(datetime.MAXYEAR,1,1)
+      backup_to_delete = munch.Munch()
       for pb in prev_backups:
         backup_date = datetime.datetime.strptime(prev_backups[pb]['created_at'], '%Y-%m-%dT%H:%M:%S.%f')
-        if backup_date > last_backup_time:
-          last_backup_time = backup_date
-
-      ## make backup
-      now = datetime.datetime.now()
-      last_backup_age_days = round((now-last_backup_time).total_seconds()/60/60/24,2)
-      if last_backup_age_days >= interval:
-        backup_name = instances[i]['name'] + "_" + v + "_" + now.strftime("%Y-%m-%dT%H-%M-%S")
-        logger.info('Creating Backup ' + backup_name + ' (last backup ' + str(last_backup_age_days) + ' days ago)')
-        try:
-          conn.create_volume_backup(v,name=backup_name,force=True,wait=wait_for_completion)
-          backup_created = True
-        except Exception as e:
-          logger.error('Backup ' + backup_name + ' failed: ' + str(e))
-          backup_created = False
-          continue
-      else:
-        logger.info('Skipping Volume ' + instances[i]['name'] + ':' + v + ' (below interval)')
-        backup_created = False
-
-      ## find oldest backup(s) and delete
-      ## len(prev_backups) is missing newly created backups so we use int(backup_created) to add 1 to it in case a backup was created or 0 if none was created
-      ## this ensures that always 'retention'-number of backups are kept
-      while len(prev_backups) + int(backup_created) > retention:
-        oldest_backup_time = datetime.datetime(datetime.MAXYEAR,1,1)
-        backup_to_delete = munch.Munch()
-        for pb in prev_backups:
-          backup_date = datetime.datetime.strptime(prev_backups[pb]['created_at'], '%Y-%m-%dT%H:%M:%S.%f')
-          if backup_date < oldest_backup_time:
-            oldest_backup_time = backup_date
-            backup_to_delete = pb
-        try:
-          conn.delete_volume_backup(backup_to_delete)
-          logger.info('Deleted Backup: ' + backup_to_delete)
-        except Exception as e:
-          logger.error('Deletion of Backup ' + backup_to_delete + ' failed: ' + str(e))
-        prev_backups.pop(backup_to_delete)
+        if backup_date < oldest_backup_time:
+          oldest_backup_time = backup_date
+          backup_to_delete = pb
+      try:
+        conn.delete_volume_backup(backup_to_delete)
+        logger.info('Deleted Backup: ' + backup_to_delete)
+      except Exception as e:
+        logger.error('Deletion of Backup ' + backup_to_delete + ' failed: ' + str(e))
+      prev_backups.pop(backup_to_delete)
 
   ## run post-script for current env
   try:

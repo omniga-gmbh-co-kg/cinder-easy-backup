@@ -159,6 +159,7 @@ for p in projects:
   ## find abandoned backups and delete
   ## loop over all backups and check if its volume_id is missing in all_volumes
   abandoned_backups = munch.Munch()
+  now = datetime.datetime.now()
   for backup_id, backup_data in all_backups.items():
     if not backup_id in all_volumes:
       abandoned_backup_date = datetime.datetime.strptime(str(backup_data['created_at']), '%Y-%m-%dT%H:%M:%S.%f')

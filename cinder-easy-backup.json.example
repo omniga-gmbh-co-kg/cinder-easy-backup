@@ -29,9 +29,17 @@
       ]
     },
     "interval": {
-      "default": 6.95,
-      "project_override" : {
-        "rgb" : 0.95
+      "backup" : {
+        "default": 6.95,
+        "project_override" : {
+          "rgb" : 0.95
+        }
+      },
+      "abandon": {
+        "default": 15,
+        "project_override" : {
+          "rgb" : 30
+        }
       }
     },
     "retention": {

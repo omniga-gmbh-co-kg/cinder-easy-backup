@@ -34,21 +34,25 @@ As a safety Feature, every Volume of every Instance that is not explicitly exclu
 To exclude an Instance or a Volume from Backups, add a Metadata attribute `backup=false`
 
 
-**backup.excludes.projects** <br>
+**backups.excludes.projects** <br>
 Exclude full Projects from Backup, supersedes Config in Metadata.
 
-**backup.interval** <br>
-  *default:* the inimum age of backups in days, before new backups are created <br>
+**backups.interval.backup** <br>
+  *default:* the minimum age of backups in days, before new backups are created <br>
   *project_override:* project specific intervals (supersedes default)
 
-**backup.post_script** <br>
-Script that get executed after all operations for the current project are finished
+**backups.interval.abandon** <br>
+  *default:* time of days to wait before deleting abandoned backups  <br>
+  *project_override:* project specific intervals (supersedes default)
 
-**backup.retention** <br>
+**backups.retention** <br>
   *default:* how many backups to keep of each volume
   *project_override:* project_specific retention (supersedes default)
 
-**backup.wait_for_completion** <br>
+**backups.post_script** <br>
+Script that get executed after all operations for the current project are finished
+
+**backups.wait_for_completion** <br>
   `true`  Wait for each Backup to complete before starting the next one<br>
   `false` Start all Backups simultaneously
 <br>

@@ -66,7 +66,8 @@ for p in cfg['backups']['excludes']['projects']:
 for p in projects:
 
   ## set interval and retention for this project
-  interval = cfg['backups']['interval']['project_override'].get(p,cfg['backups']['interval']['default'])
+  interval = cfg['backups']['interval']['backup']['project_override'].get(p,cfg['backups']['interval']['backup']['default'])
+  abandon_interval = cfg['backups']['interval']['abandon']['project_override'].get(p,cfg['backups']['interval']['abandon']['default'])
   retention = cfg['backups']['retention']['project_override'].get(p,cfg['backups']['retention']['default'])
   wait_for_completion = cfg['backups']['wait_for_completion']['project_override'].get(p,cfg['backups']['wait_for_completion']['default'])
 
@@ -75,7 +76,7 @@ for p in projects:
 
   ## get available backups
   try:
-    all_backups = conn.list_volume_backups()
+    all_backups = promoteToIndex(conn.list_volume_backups(),'id')
   except:
     logger.warning('Skipping Project ' + p + ' (no permissions)')
     continue
@@ -107,14 +108,15 @@ for p in projects:
   for volume_id,volume_data in all_volumes.items():
     ## look for previous backups of this volume
     prev_backups = munch.Munch()
-    for b in all_backups:
-      if b['volume_id'] == volume_id:
-        prev_backups[b['id']] = b
+    for backup_id,backup_data in all_backups.items():
+      if backup_data['volume_id'] == volume_id:
+        prev_backups[backup_id] = backup_data
 
     ## find newest backup and compare timestamps
     last_backup_time = datetime.datetime(datetime.MINYEAR,1,1)
-    for pb in prev_backups:
-      backup_date = datetime.datetime.strptime(prev_backups[pb]['created_at'], '%Y-%m-%dT%H:%M:%S.%f')
+    prev_backups
+    for pbackup_id,pbackup_data in prev_backups.items():
+      backup_date = datetime.datetime.strptime(pbackup_data['created_at'], '%Y-%m-%dT%H:%M:%S.%f')
       if backup_date > last_backup_time:
         last_backup_time = backup_date
 
@@ -142,17 +144,32 @@ for p in projects:
     while len(prev_backups) + int(backup_created) > retention:
       oldest_backup_time = datetime.datetime(datetime.MAXYEAR,1,1)
       backup_to_delete = munch.Munch()
-      for pb in prev_backups:
-        backup_date = datetime.datetime.strptime(prev_backups[pb]['created_at'], '%Y-%m-%dT%H:%M:%S.%f')
+      for pbackup_id,pbackup_data in prev_backups.items():
+        backup_date = datetime.datetime.strptime(pbackup_data['created_at'], '%Y-%m-%dT%H:%M:%S.%f')
         if backup_date < oldest_backup_time:
           oldest_backup_time = backup_date
-          backup_to_delete = pb
+          backup_to_delete = pbackup_id
       try:
         conn.delete_volume_backup(backup_to_delete)
         logger.info('Deleted Backup: ' + backup_to_delete)
       except Exception as e:
         logger.error('Deletion of Backup ' + backup_to_delete + ' failed: ' + str(e))
       prev_backups.pop(backup_to_delete)
+
+  ## find abandoned backups and delete
+  ## loop over all backups and check if its volume_id is missing in all_volumes
+  abandoned_backups = munch.Munch()
+  for backup_id, backup_data in all_backups.items():
+    if not backup_id in all_volumes:
+      abandoned_backup_date = datetime.datetime.strptime(str(backup_data['created_at']), '%Y-%m-%dT%H:%M:%S.%f')
+      abandoned_backup_age_days = round((now-abandoned_backup_date).total_seconds()/60/60/24,2)
+      ## delete abandoned Backups
+      if abandoned_backup_age_days >= abandon_interval:
+        try:
+          conn.delete_volume_backup(backup_id)
+          logger.info('Deleted abandoned Backup : ' + backup_data['name'] + ' (Instance missing for ' + str(abandoned_backup_age_days) + ' Days)')
+        except Exception as e:
+          logger.error('Deletion of Backup ' + backup_data['name'] + ' failed: ' + str(e))
 
   ## run post-script for current env
   try:

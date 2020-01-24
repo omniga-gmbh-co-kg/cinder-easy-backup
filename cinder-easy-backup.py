@@ -161,7 +161,7 @@ for p in projects:
   abandoned_backups = munch.Munch()
   now = datetime.datetime.now()
   for backup_id, backup_data in all_backups.items():
-    if not backup_id in all_volumes:
+    if not backup_data['volume_id'] in all_volumes:
       abandoned_backup_date = datetime.datetime.strptime(str(backup_data['created_at']), '%Y-%m-%dT%H:%M:%S.%f')
       abandoned_backup_age_days = round((now-abandoned_backup_date).total_seconds()/60/60/24,2)
       ## delete abandoned Backups
